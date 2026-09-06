@@ -1,0 +1,17 @@
+# Downloaded binaries — ~300 MB, refetched on first run by bins.js
+bin/
+
+# Local machine state
+settings.json
+node_modules/
+
+# Session cookies for logged-in sites. Never commit this: it is a live
+# credential for whatever accounts you exported it from.
+cookies.txt
+*.cookies.txt
+
+# Scratch
+*.log
+*.part
+.DS_Store
+Thumbs.db

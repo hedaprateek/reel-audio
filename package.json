@@ -1,0 +1,15 @@
+{
+  "name": "reel-audio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Paste Instagram / YouTube / TikTok links, get the audio as MP3.",
+  "type": "module",
+  "scripts": {
+    "start": "node --use-system-ca server.js",
+    "setup": "node --use-system-ca bins.js",
+    "cli": "node --use-system-ca cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
