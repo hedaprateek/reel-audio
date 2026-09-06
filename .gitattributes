@@ -1,0 +1,8 @@
+# Never let line-ending conversion touch the wasm engine — a single altered
+# byte makes it unloadable, and the damage happens silently on clone.
+*.wasm binary
+*.mp3 binary
+*.m4a binary
+
+# Keep the launcher CRLF so cmd.exe is happy on Windows.
+*.cmd text eol=crlf

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video to Audio — extract the sound from any clip, in your browser</title>
+<meta name="description" content="Drop in a video, get the audio out as MP3. Runs entirely in your browser — nothing is uploaded.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f4; --panel: #fff; --line: #e2e1dd;
+    --text: #1d1c1a; --muted: #6f6d68;
+    --accent: #c8623a; --ok: #2f7d4f; --err: #b3402f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17161a; --panel: #201f24; --line: #33313a;
+      --text: #eceaf0; --muted: #9a97a3;
+      --accent: #e07d54; --ok: #63c48b; --err: #ef7d6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 18px 60px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .tag { color: var(--muted); font-size: 15px; margin: 0 0 28px; }
+  .privacy {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--ok); margin-bottom: 22px;
+    border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+    background: color-mix(in srgb, var(--ok) 8%, transparent);
+    padding: 7px 12px; border-radius: 999px;
+  }
+  #drop {
+    border: 2px dashed var(--line); border-radius: 14px;
+    background: var(--panel); padding: 40px 20px; text-align: center;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  #drop:hover, #drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+  #drop.over { transform: scale(1.005); }
+  .drop-big { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .drop-small { color: var(--muted); font-size: 13.5px; }
+  input[type=file] { display: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 18px 0 8px; }
+  label.field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+  select {
+    font: inherit; padding: 9px 11px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  select:focus-visible, #drop:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .hint { font-size: 12.5px; color: var(--muted); flex: 1; min-width: 190px; }
+  .job {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 11px; padding: 13px 15px; margin-top: 11px;
+  }
+  .job-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .job-name { font-weight: 600; font-size: 14.5px; word-break: break-word; }
+  .job-stat { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .job.done .bar > i { background: var(--ok); }
+  .job.error .bar > i { background: var(--err); width: 100% !important; }
+  .job .err { color: var(--err); font-size: 12.5px; margin-top: 8px; }
+  button.save {
+    margin-top: 11px; font: inherit; font-weight: 600; font-size: 14px;
+    padding: 9px 16px; border-radius: 9px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; width: 100%;
+  }
+  button.save:hover { filter: brightness(1.08); }
+  #engine { margin-top: 18px; font-size: 13px; color: var(--muted); display: none; }
+  #engine.show { display: block; }
+  footer {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; font-size: 13.5px; color: var(--muted); }
+  details p { font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Video&nbsp;→&nbsp;Audio</h1>
+  <p class="tag">Drop in a clip, get the sound out as an audio file.</p>
+  <div class="privacy">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+      <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>
+    </svg>
+    Runs entirely on your device — nothing is uploaded
+  </div>
+
+  <div id="drop" tabindex="0" role="button" aria-label="Choose a video file">
+    <div class="drop-big">Tap to choose a video</div>
+    <div class="drop-small">or drag one here &middot; MP4, MOV, WEBM, MKV, AVI</div>
+  </div>
+  <input type="file" id="file" accept="video/*,audio/*" multiple>
+
+  <div class="controls">
+    <label class="field">Output
+      <select id="format">
+        <option value="mp3">MP3 — plays everywhere</option>
+        <option value="copy">Original quality — no re-encode</option>
+        <option value="wav">WAV — uncompressed</option>
+      </select>
+    </label>
+    <div class="hint" id="hint">Re-encodes to MP3 at roughly 190 kbps.</div>
+  </div>
+
+  <div id="engine"></div>
+  <div id="jobs"></div>
+
+  <details>
+    <summary>How do I get the video out of Instagram or YouTube?</summary>
+    <p>This page converts a file you already have — it can't fetch from a link, because
+    browsers block one site from reading another's content. Save the clip first
+    (Instagram: <b>⋯ → Download</b>; many apps have a Save or Share-to-Files option),
+    then drop that file here.</p>
+    <p>If you'd rather paste links directly, the companion tool does that, but it has to
+    run on your own machine — <a href="https://github.com/hedaprateek/reel-audio">grab it here</a>.</p>
+  </details>
+
+  <footer>
+    Powered by <a href="https://github.com/ffmpegwasm/ffmpeg.wasm">ffmpeg.wasm</a>.
+    First use downloads a ~31&nbsp;MB engine, then it's cached.
+    <a href="https://github.com/hedaprateek/reel-audio">Source</a>.
+    Please only convert media you have the right to use.
+  </footer>
+</div>
+
+<script src="vendor/ffmpeg.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const { FFmpeg } = FFmpegWASM;
+
+  let ffmpeg = null;
+  let enginePromise = null;
+  let queue = Promise.resolve();   // ffmpeg.wasm handles one job at a time
+  let seq = 0;
+
+  const HINTS = {
+    mp3: 'Re-encodes to MP3 at roughly 190 kbps.',
+    copy: "Lifts the audio track out untouched — fastest, no quality loss. You'll usually get an .m4a.",
+    wav: 'Uncompressed. Large files, best for editing.',
+  };
+  $('format').addEventListener('change', (e) => { $('hint').textContent = HINTS[e.target.value]; });
+
+  // ---- engine -------------------------------------------------------------
+
+  function setEngine(msg) {
+    const el = $('engine');
+    el.textContent = msg;
+    el.classList.toggle('show', Boolean(msg));
+  }
+
+  async function fetchWithProgress(url, onProgress) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Couldn't load the engine (HTTP ${res.status}).`);
+    const total = Number(res.headers.get('content-length')) || 0;
+    if (!res.body) return res.blob();
+    const reader = res.body.getReader();
+    const chunks = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      got += value.length;
+      if (total) onProgress(got / total);
+    }
+    return new Blob(chunks);
+  }
+
+  function loadEngine() {
+    if (enginePromise) return enginePromise;
+    enginePromise = (async () => {
+      ffmpeg = new FFmpeg();
+      setEngine('Loading the audio engine (~31 MB, one time)…');
+
+      // Pre-fetch the wasm ourselves purely so the first-load wait has a real
+      // percentage instead of an unexplained pause. Fall back to letting
+      // ffmpeg.wasm fetch it if the blob handoff is rejected.
+      let wasmURL = 'vendor/ffmpeg-core.wasm';
+      try {
+        const blob = await fetchWithProgress(wasmURL, (p) =>
+          setEngine(`Loading the audio engine… ${Math.round(p * 100)}%`));
+        wasmURL = URL.createObjectURL(blob);
+      } catch { /* keep the plain path */ }
+
+      try {
+        await ffmpeg.load({ coreURL: 'vendor/ffmpeg-core.js', wasmURL });
+      } catch (err) {
+        if (wasmURL.startsWith('blob:')) {
+          ffmpeg = new FFmpeg();
+          await ffmpeg.load({ coreURL: 'vendor/ffmpeg-core.js', wasmURL: 'vendor/ffmpeg-core.wasm' });
+        } else throw err;
+      }
+      setEngine('');
+      return ffmpeg;
+    })().catch((err) => {
+      enginePromise = null;
+      setEngine('');
+      throw err;
+    });
+    return enginePromise;
+  }
+
+  // ---- jobs ---------------------------------------------------------------
+
+  const PLAN = {
+    mp3:  { args: ['-vn', '-acodec', 'libmp3lame', '-q:a', '2'], ext: 'mp3' },
+    wav:  { args: ['-vn', '-acodec', 'pcm_s16le'],               ext: 'wav' },
+    copy: { args: ['-vn', '-acodec', 'copy'],                    ext: 'm4a' },
+  };
+
+  function addJobCard(name) {
+    const id = `job${++seq}`;
+    const el = document.createElement('div');
+    el.className = 'job';
+    el.id = id;
+    el.innerHTML = `
+      <div class="job-top">
+        <span class="job-name"></span>
+        <span class="job-stat">waiting</span>
+      </div>
+      <div class="bar"><i></i></div>`;
+    el.querySelector('.job-name').textContent = name;
+    $('jobs').prepend(el);
+    return {
+      el,
+      stat: (t) => { el.querySelector('.job-stat').textContent = t; },
+      pct: (p) => { el.querySelector('.bar > i').style.width = `${Math.max(0, Math.min(100, p))}%`; },
+      fail: (msg) => {
+        el.classList.add('error');
+        el.querySelector('.job-stat').textContent = 'failed';
+        const d = document.createElement('div');
+        d.className = 'err';
+        d.textContent = msg;
+        el.appendChild(d);
+      },
+      done: (blob, filename, size) => {
+        el.classList.add('done');
+        el.querySelector('.job-stat').textContent = size;
+        const url = URL.createObjectURL(blob);
+        const btn = document.createElement('button');
+        btn.className = 'save';
+        btn.textContent = 'Save audio';
+        btn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        };
+        el.appendChild(btn);
+      },
+    };
+  }
+
+  const fmtSize = (b) => (b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
+  const baseName = (n) => n.replace(/\.[^.]+$/, '') || 'audio';
+
+  async function convert(file, format, card) {
+    const ff = await loadEngine();
+    const inName = `in_${seq}_${Date.now()}`;
+    let plan = PLAN[format];
+
+    card.stat('reading');
+    await ff.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
+
+    const onProgress = ({ progress }) => {
+      if (progress > 0 && progress <= 1) {
+        card.pct(progress * 100);
+        card.stat(`${Math.round(progress * 100)}%`);
+      }
+    };
+    ff.on('progress', onProgress);
+
+    const run = async (p) => {
+      const out = `out_${seq}_${Date.now()}.${p.ext}`;
+      const code = await ff.exec([...['-i', inName], ...p.args, out]);
+      if (code !== 0) throw new Error(`ffmpeg exited with code ${code}`);
+      return { data: await ff.readFile(out), out };
+    };
+
+    try {
+      let result;
+      try {
+        result = await run(plan);
+      } catch (err) {
+        // "copy" only works when the source codec fits an .m4a container;
+        // anything else (Opus in WebM, say) has to be re-encoded.
+        if (format !== 'copy') throw err;
+        card.stat('re-encoding');
+        plan = PLAN.mp3;
+        result = await run(plan);
+      }
+
+      const blob = new Blob([result.data.buffer], { type: `audio/${plan.ext}` });
+      if (!blob.size) throw new Error('No audio track found in that file.');
+
+      card.pct(100);
+      card.done(blob, `${baseName(file.name)}.${plan.ext}`, fmtSize(blob.size));
+
+      try { await ff.deleteFile(inName); await ff.deleteFile(result.out); } catch {}
+    } finally {
+      ff.off('progress', onProgress);
+    }
+  }
+
+  function handleFiles(files) {
+    const format = $('format').value;
+    for (const file of files) {
+      const card = addJobCard(file.name);
+      queue = queue.then(async () => {
+        try {
+          card.stat('starting');
+          await convert(file, format, card);
+        } catch (err) {
+          const msg = /memory|allocat|OOM/i.test(err.message || '')
+            ? 'Ran out of memory — this file is too large for the browser to handle. Try a shorter clip.'
+            : err.message || 'Conversion failed.';
+          card.fail(msg);
+        }
+      });
+    }
+  }
+
+  // ---- input --------------------------------------------------------------
+
+  const drop = $('drop');
+  const input = $('file');
+
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  input.addEventListener('change', () => {
+    if (input.files.length) handleFiles([...input.files]);
+    input.value = '';
+  });
+
+  for (const evt of ['dragenter', 'dragover']) {
+    drop.addEventListener(evt, (e) => { e.preventDefault(); drop.classList.add('over'); });
+  }
+  for (const evt of ['dragleave', 'drop']) {
+    drop.addEventListener(evt, () => drop.classList.remove('over'));
+  }
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer?.files?.length) handleFiles([...e.dataTransfer.files]);
+  });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
+})();
+</script>
+</body>
+</html>
