@@ -3,6 +3,21 @@
 Paste links to Instagram reels, YouTube shorts, TikToks or regular videos. Get the audio
 back as tagged MP3 files.
 
+There are two halves to this, and which one you want depends on whether you have a *link*
+or a *file*:
+
+| | **[Web converter](https://hedaprateek.github.io/reel-audio/)** | **Local app** (this repo) |
+| --- | --- | --- |
+| Takes | a video file you already saved | a link, pasted directly |
+| Needs installing | no — it's a web page | yes, Node on your machine |
+| Works on a phone | yes | only via your own network |
+| Where the work happens | in your browser tab | on your machine |
+
+The web converter can't accept links, and that isn't a missing feature: browsers block a
+page from reading another site's content (CORS), so no static site can fetch from
+Instagram or YouTube. Downloading needs a process outside the browser, which is what the
+local app is.
+
 ## Running it
 
 Double-click **`Start Reel Audio.cmd`**. It opens <http://localhost:5599> in your browser.
